@@ -20,7 +20,7 @@ jobs:
             set -e
             cd /var/www/vhosts/witts-sol.com/httpdocs/voice-phone-demo
 
-            git pull origin main
+            git pull origin master
 
             # 의존성 업데이트
             .venv/bin/pip install -r requirements.server.txt -q
