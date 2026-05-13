@@ -1,0 +1,30 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /var/www/vhosts/witts-sol.com/httpdocs/voice-phone-demo
+
+            git pull origin main
+
+            # 의존성 업데이트
+            .venv/bin/pip install -r requirements.server.txt -q
+
+            # 서비스 재시작
+            systemctl restart voice-phone-demo
+            echo "Deploy complete"

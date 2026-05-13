@@ -1,30 +1,31 @@
 import os
 import tempfile
-import numpy as np
-import soundfile as sf
-from voxcpm import VoxCPM
 
-SAMPLE_RATE = 24000
-
-_model: VoxCPM | None = None
-
-
-def _get_model() -> VoxCPM:
-    global _model
-    if _model is None:
-        _model = VoxCPM()
-    return _model
+# TTS_ENGINE=voxcpm → VoxCPM2 voice cloning (requires GPU)
+# TTS_ENGINE=openai  → OpenAI TTS API (server default, no GPU needed)
+TTS_ENGINE = os.getenv("TTS_ENGINE", "openai")
 
 
 def synthesize(text: str, reference_wav_path: str) -> bytes:
-    """Returns WAV bytes synthesized in the voice of the reference audio."""
+    if TTS_ENGINE == "voxcpm":
+        return _synthesize_voxcpm(text, reference_wav_path)
+    return _synthesize_openai(text)
+
+
+# ── VoxCPM2 (local, GPU required) ────────────────────────────────────────────
+
+def _synthesize_voxcpm(text: str, reference_wav_path: str) -> bytes:
+    import numpy as np
+    import soundfile as sf
+    from voxcpm import VoxCPM
+
     model = _get_model()
     audio = model.generate(text=text, reference_wav_path=reference_wav_path)
 
     if isinstance(audio, tuple):
         audio, sr = audio
     else:
-        sr = SAMPLE_RATE
+        sr = 24000
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         tmp_path = f.name
@@ -34,3 +35,27 @@ def synthesize(text: str, reference_wav_path: str) -> bytes:
             return f.read()
     finally:
         os.unlink(tmp_path)
+
+
+_voxcpm_model = None
+
+def _get_model():
+    global _voxcpm_model
+    if _voxcpm_model is None:
+        from voxcpm import VoxCPM
+        _voxcpm_model = VoxCPM()
+    return _voxcpm_model
+
+
+# ── OpenAI TTS (server, no GPU) ───────────────────────────────────────────────
+
+def _synthesize_openai(text: str) -> bytes:
+    from openai import OpenAI
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "test-api-key")
+    response = client.audio.speech.create(
+        model="tts-1",
+        voice="nova",
+        input=text,
+        response_format="wav"
+    )
+    return response.content
