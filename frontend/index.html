@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 電話対応デモ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, sans-serif; background: #f0f2f5; color: #333; }
+    .container { max-width: 600px; margin: 40px auto; padding: 0 20px; }
+    h1 { font-size: 22px; margin-bottom: 24px; color: #1a1a2e; }
+    .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .card h2 { font-size: 16px; margin-bottom: 12px; color: #555; }
+    blockquote { background: #f8f9fa; border-left: 3px solid #3498db; padding: 12px 16px; border-radius: 4px; font-style: italic; margin: 12px 0; line-height: 1.6; }
+    button { padding: 12px 24px; font-size: 15px; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-red { background: #e74c3c; color: white; }
+    .btn-red:hover:not(:disabled) { background: #c0392b; }
+    .btn-red.recording { animation: pulse 1s infinite; }
+    .btn-green { background: #27ae60; color: white; margin-left: 8px; }
+    .btn-green:hover:not(:disabled) { background: #219a52; }
+    .btn-blue { background: #3498db; color: white; width: 100%; padding: 20px; font-size: 18px; }
+    .btn-blue:hover:not(:disabled) { background: #2980b9; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+    #chat-log { min-height: 80px; max-height: 320px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+    .msg-wrap { display: flex; flex-direction: column; }
+    .msg { margin: 6px 0; padding: 8px 14px; border-radius: 18px; max-width: 85%; font-size: 14px; line-height: 1.5; }
+    .msg-user { background: #3498db; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg-ai { background: white; border: 1px solid #e0e0e0; align-self: flex-start; border-bottom-left-radius: 4px; }
+    #status { font-size: 13px; color: #7f8c8d; margin-bottom: 12px; min-height: 20px; }
+    .hidden { display: none; }
+    .step-label { font-size: 12px; font-weight: bold; color: #3498db; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🎤 AI 電話対応デモ</h1>
+
+  <!-- Step 1: 声の登録 -->
+  <div class="card" id="step-register">
+    <div class="step-label">STEP 1</div>
+    <h2>声を登録する</h2>
+    <p style="font-size:14px;color:#666;margin-bottom:8px;">下のテキストを読み上げながら録音してください（約10秒）:</p>
+    <blockquote>「こんにちは。本日はお電話いただきありがとうございます。少々お待ちください。どのようなご用件でしょうか。」</blockquote>
+    <div style="margin-top:16px;">
+      <button class="btn-red" id="btn-rec" onclick="toggleRegister()">● 録音開始</button>
+      <button class="btn-green hidden" id="btn-send-voice" onclick="submitVoice()">✓ 登録する</button>
+    </div>
+    <p id="reg-status" style="font-size:13px;color:#7f8c8d;margin-top:10px;"></p>
+  </div>
+
+  <!-- Step 2: 会話 -->
+  <div class="card hidden" id="step-chat">
+    <div class="step-label">STEP 2</div>
+    <h2>話しかける</h2>
+    <div class="msg-wrap" id="chat-log"></div>
+    <div id="status">ボタンを押している間、話してください</div>
+    <button class="btn-blue" id="btn-speak"
+      onmousedown="startChat()" onmouseup="stopChat()"
+      ontouchstart="startChat(event)" ontouchend="stopChat(event)">
+      🎤 押して話す
+    </button>
+  </div>
+</div>
+
+<script>
+  let recorder = null;
+  let chunks = [];
+  let regBlob = null;
+  let chatStream = null;
+
+  async function toggleRegister() {
+    const btn = document.getElementById('btn-rec');
+    if (recorder && recorder.state === 'recording') {
+      recorder.stop();
+      btn.textContent = '● 録音開始';
+      btn.classList.remove('recording');
+      return;
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    chunks = [];
+    recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      regBlob = new Blob(chunks, { type: 'audio/webm' });
+      document.getElementById('btn-send-voice').classList.remove('hidden');
+      document.getElementById('reg-status').textContent = '録音完了 ✓ 登録ボタンを押してください';
+    };
+    recorder.start();
+    btn.textContent = '■ 録音停止';
+    btn.classList.add('recording');
+  }
+
+  async function submitVoice() {
+    if (!regBlob) return;
+    document.getElementById('reg-status').textContent = '登録中...';
+    const form = new FormData();
+    form.append('file', regBlob, 'voice.webm');
+    const res = await fetch('/register-voice', { method: 'POST', body: form });
+    if (res.ok) {
+      document.getElementById('step-register').classList.add('hidden');
+      document.getElementById('step-chat').classList.remove('hidden');
+    } else {
+      document.getElementById('reg-status').textContent = 'エラーが発生しました。もう一度お試しください。';
+    }
+  }
+
+  async function startChat(e) {
+    if (e) e.preventDefault();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    chatStream = stream;
+    chunks = [];
+    recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = ev => chunks.push(ev.data);
+    recorder.start();
+    document.getElementById('btn-speak').textContent = '🔴 録音中... (離して送信)';
+    document.getElementById('status').textContent = '話してください...';
+  }
+
+  async function stopChat(e) {
+    if (e) e.preventDefault();
+    if (!recorder || recorder.state !== 'recording') return;
+    recorder.onstop = async () => {
+      if (chatStream) chatStream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      await sendChat(blob);
+    };
+    recorder.stop();
+  }
+
+  async function sendChat(blob) {
+    const btn = document.getElementById('btn-speak');
+    btn.disabled = true;
+    document.getElementById('status').textContent = 'AI が考え中...';
+    const form = new FormData();
+    form.append('file', blob, 'chat.webm');
+    try {
+      const res = await fetch('/chat', { method: 'POST', body: form });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      addMsg(data.user_text, 'msg-user');
+      addMsg(data.reply_text, 'msg-ai');
+      document.getElementById('status').textContent = 'AI が返答中...';
+      await playAudio(data.audio_base64);
+    } catch (err) {
+      document.getElementById('status').textContent = 'エラー: ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🎤 押して話す';
+      document.getElementById('status').textContent = 'ボタンを押している間、話してください';
+    }
+  }
+
+  function addMsg(text, cls) {
+    const log = document.getElementById('chat-log');
+    const div = document.createElement('div');
+    div.className = 'msg ' + cls;
+    div.textContent = text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function playAudio(b64) {
+    return new Promise(resolve => {
+      const bytes = atob(b64);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([arr], { type: 'audio/wav' }));
+      const audio = new Audio(url);
+      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+      audio.onerror = resolve;
+      audio.play();
+    });
+  }
+</script>
+</body>
+</html>
