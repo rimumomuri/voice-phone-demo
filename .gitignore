@@ -1,0 +1,5 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+backend/reference_voice/user.wav
