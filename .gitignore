@@ -1,5 +1,8 @@
 .env
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 backend/reference_voice/user.wav
+backend/reference_voice/user.txt
+.pytest_cache/

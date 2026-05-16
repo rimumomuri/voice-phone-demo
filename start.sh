@@ -1,7 +1,7 @@
 #!/bin/bash
 # 로컬 개발 서버 + ngrok 동시 실행
 
-PORT=8080
+PORT=8082
 cd "$(dirname "$0")/backend"
 
 echo "Starting FastAPI server on port $PORT..."

@@ -1,0 +1,16 @@
+# GPUSOROBAN GPU 서버용 requirements
+# torch / torchaudio / CUDA 는 서버에 사전 설치되어 있으므로 제외
+# 설치: pip install -r requirements.gpu.txt
+
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9
+openai==1.40.0
+voxcpm
+soundfile==0.12.1
+numpy==1.26.4
+scipy
+pydub==0.25.1
+python-dotenv==1.0.0
+httpx==0.27.0
+torchcodec

@@ -5,6 +5,7 @@ openai==1.40.0
 voxcpm
 soundfile==0.12.1
 numpy==1.26.4
+scipy
 pydub==0.25.1
 python-dotenv==1.0.0
 pytest==8.3.0
