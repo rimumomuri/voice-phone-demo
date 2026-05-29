@@ -27,7 +27,7 @@ from pydub import AudioSegment
 
 from stt import transcribe
 from llm import chat, Message
-from tts import synthesize
+from tts import synthesize, list_engines
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -53,9 +53,9 @@ if _old_wav.exists():
 conversation_history: list[Message] = []
 
 
-def _tts_cache_path(voice_dir: Path, text: str) -> Path:
-    cache_dir = voice_dir / "cache"
-    cache_dir.mkdir(exist_ok=True)
+def _tts_cache_path(voice_dir: Path, text: str, engine: str = "default") -> Path:
+    cache_dir = voice_dir / "cache" / engine
+    cache_dir.mkdir(parents=True, exist_ok=True)
     text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()[:16]
     return cache_dir / f"{text_hash}.wav"
 
@@ -79,6 +79,11 @@ def _get_voice_dir(voice_id: Optional[str]) -> Optional[Path]:
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/tts/engines")
+def get_engines():
+    return JSONResponse(list_engines())
 
 
 # ── Voice management ──────────────────────────────────────────────────────────
@@ -170,66 +175,66 @@ async def llm_endpoint(body: dict = Body(...)):
 async def tts_endpoint(body: dict = Body(...)):
     text = body.get("text", "")
     voice_id = body.get("voice_id")
+    engine = body.get("engine") or os.getenv("TTS_ENGINE", "openai")
     if not text.strip():
         raise HTTPException(status_code=422, detail="テキストが空です。")
     voice_dir = _get_voice_dir(voice_id)
     if voice_dir is None:
         raise HTTPException(status_code=400, detail="声が登録されていません。")
 
-    # キャッシュ確認
-    cache_file = _tts_cache_path(voice_dir, text)
+    cache_file = _tts_cache_path(voice_dir, text, engine)
     if cache_file.exists():
         audio_b64 = base64.b64encode(cache_file.read_bytes()).decode()
-        return JSONResponse({"audio_base64": audio_b64, "elapsed": 0.0, "cached": True})
+        return JSONResponse({"audio_base64": audio_b64, "elapsed": 0.0, "cached": True, "engine": engine})
 
     ref_text = (voice_dir / "voice.txt").read_text(encoding="utf-8") if (voice_dir / "voice.txt").exists() else None
     t0 = time.time()
     try:
-        wav_bytes = synthesize(text, str(voice_dir / "voice.wav"), ref_text)
+        wav_bytes = synthesize(text, str(voice_dir / "voice.wav"), ref_text, engine=engine)
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
     elapsed = round(time.time() - t0, 2)
-
-    # キャッシュ保存
     cache_file.write_bytes(wav_bytes)
 
     audio_b64 = base64.b64encode(wav_bytes).decode()
-    return JSONResponse({"audio_base64": audio_b64, "elapsed": elapsed, "cached": False})
+    return JSONResponse({"audio_base64": audio_b64, "elapsed": elapsed, "cached": False, "engine": engine})
 
 
-def _do_warm_cache(voice_dir: Path, texts: list):
+def _do_warm_cache(voice_dir: Path, texts: list, engine: str):
     ref_text = (voice_dir / "voice.txt").read_text(encoding="utf-8") if (voice_dir / "voice.txt").exists() else None
     for text in texts:
         if not text.strip():
             continue
-        cache_file = _tts_cache_path(voice_dir, text)
+        cache_file = _tts_cache_path(voice_dir, text, engine)
         if cache_file.exists():
             continue
         try:
-            wav_bytes = synthesize(text, str(voice_dir / "voice.wav"), ref_text)
+            wav_bytes = synthesize(text, str(voice_dir / "voice.wav"), ref_text, engine=engine)
             cache_file.write_bytes(wav_bytes)
         except Exception as e:
-            print(f"warm-cache failed: {e}")
+            print(f"warm-cache [{engine}] failed: {e}")
 
 
 @app.post("/voices/{voice_id}/warm-cache")
 def warm_cache_endpoint(voice_id: str, body: dict = Body(...)):
     texts = body.get("texts", [])
+    engine = body.get("engine") or os.getenv("TTS_ENGINE", "openai")
     voice_dir = _get_voice_dir(voice_id)
     if voice_dir is None:
         raise HTTPException(status_code=404, detail="Voice not found")
-    threading.Thread(target=_do_warm_cache, args=(voice_dir, texts[:30]), daemon=True).start()
-    return JSONResponse({"status": "warming", "count": len(texts)})
+    threading.Thread(target=_do_warm_cache, args=(voice_dir, texts[:30], engine), daemon=True).start()
+    return JSONResponse({"status": "warming", "count": len(texts), "engine": engine})
 
 
 @app.post("/tts/cache-check")
 def tts_cache_check(body: dict = Body(...)):
     voice_id = body.get("voice_id")
     texts = body.get("texts", [])
+    engine = body.get("engine") or os.getenv("TTS_ENGINE", "openai")
     voice_dir = _get_voice_dir(voice_id)
     if voice_dir is None:
         return JSONResponse({"ready": []})
-    ready = [t for t in texts if _tts_cache_path(voice_dir, t).exists()]
+    ready = [t for t in texts if _tts_cache_path(voice_dir, t, engine).exists()]
     return JSONResponse({"ready": ready})
 
 

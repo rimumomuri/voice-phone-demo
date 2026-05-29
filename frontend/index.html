@@ -90,6 +90,50 @@
     }
     .voice-chip-add:active { background: #f5f5f5; }
 
+    /* Engine strip */
+    .engine-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: #fafafa;
+      border-bottom: 1px solid #e5e5ea;
+      overflow-x: auto;
+      flex-shrink: 0;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .engine-strip::-webkit-scrollbar { display: none; }
+    .engine-strip-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+      color: #aaa; flex-shrink: 0; text-transform: uppercase;
+    }
+    .engine-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 11px;
+      border-radius: 20px;
+      border: 1.5px solid #e5e5ea;
+      background: #f7f7f7;
+      font-size: 12px; font-weight: 500; color: #555;
+      white-space: nowrap; cursor: pointer; flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .engine-chip.selected { background: #1c1c1e; color: #fff; border-color: #1c1c1e; }
+    .engine-chip.unavailable { opacity: 0.4; cursor: not-allowed; }
+    .engine-badge {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.3px;
+      padding: 1px 5px; border-radius: 6px;
+      background: rgba(255,255,255,0.18);
+    }
+    .engine-chip:not(.selected) .engine-badge { background: rgba(0,0,0,0.07); color: #888; }
+    .engine-badge.fast  { color: #34c759; }
+    .engine-chip.selected .engine-badge.fast { color: #a8f5bc; }
+    .engine-badge.medium { color: #ff9500; }
+    .engine-chip.selected .engine-badge.medium { color: #ffd5a0; }
+    .engine-badge.slow  { color: #ff3b30; }
+    .engine-chip.selected .engine-badge.slow { color: #ffb3b0; }
+
     /* Tabs */
     .tabs {
       display: flex;
@@ -288,6 +332,11 @@
   <!-- populated by JS -->
 </div>
 
+<!-- Engine strip -->
+<div class="engine-strip" id="engine-strip">
+  <!-- populated by JS -->
+</div>
+
 <!-- Tabs -->
 <div class="tabs">
   <div class="tab active" id="tab-chat" onclick="switchTab('chat')">AI 会話</div>
@@ -423,7 +472,9 @@
   let recorder = null, chunks = [], regBlob = null;
   let chatStream = null, audioCtx = null;
   let selectedVoiceId = null;
+  let selectedEngine = null;
   let voices = [];
+  let engines = [];
   const readyPhrases = new Set();
   let cachePollingTimer = null;
 
@@ -454,6 +505,57 @@
     if (!selectedVoiceId && voices.length > 0) {
       selectVoice(voices[0].id, false);
     }
+  }
+
+  // ── Engine strip ──────────────────────────────────────────────
+  async function loadEngines() {
+    try {
+      const res = await fetch('tts/engines');
+      engines = res.ok ? await res.json() : [];
+    } catch { engines = []; }
+    // default: first available engine
+    if (!selectedEngine) {
+      const avail = engines.find(e => e.available);
+      if (avail) selectedEngine = avail.id;
+    }
+    renderEngineStrip();
+  }
+
+  function renderEngineStrip() {
+    const strip = document.getElementById('engine-strip');
+    strip.innerHTML = '';
+
+    const label = document.createElement('span');
+    label.className = 'engine-strip-label';
+    label.textContent = 'Model';
+    strip.appendChild(label);
+
+    const speedLabel = { fast: '速い', medium: '普通', slow: '遅い' };
+
+    engines.forEach(e => {
+      const chip = document.createElement('div');
+      chip.className = 'engine-chip' +
+        (e.id === selectedEngine ? ' selected' : '') +
+        (!e.available ? ' unavailable' : '');
+      chip.innerHTML =
+        `<span>${escHtml(e.name)}</span>` +
+        `<span class="engine-badge ${e.speed}">${speedLabel[e.speed] || e.speed}</span>` +
+        (!e.available ? `<span class="engine-badge" style="color:#aaa">未インストール</span>` : '');
+      chip.addEventListener('click', () => {
+        if (!e.available) { alert(`${e.name} はこのサーバーにインストールされていません。`); return; }
+        selectEngine(e.id);
+      });
+      strip.appendChild(chip);
+    });
+  }
+
+  function selectEngine(id) {
+    selectedEngine = id;
+    renderEngineStrip();
+    readyPhrases.clear();
+    markReadyButtons();
+    if (selectedVoiceId) startWarmCache(selectedVoiceId);
+    addMsg(`モデル: ${engines.find(e => e.id === id)?.name || id} に切り替えました。`, 'system');
   }
 
   function renderVoiceStrip() {
@@ -516,13 +618,11 @@
       await fetch('voices/' + voiceId + '/warm-cache', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texts: phrases })
+        body: JSON.stringify({ texts: phrases, engine: selectedEngine })
       });
     } catch {}
-    // Poll every 15s to check which phrases are ready
     await checkCacheStatus(voiceId);
     cachePollingTimer = setInterval(() => checkCacheStatus(voiceId), 15000);
-    // Stop polling after 10 minutes
     setTimeout(() => { if (cachePollingTimer) clearInterval(cachePollingTimer); }, 600000);
   }
 
@@ -532,15 +632,13 @@
       const res = await fetch('tts/cache-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voice_id: voiceId, texts: getScriptPhrases() })
+        body: JSON.stringify({ voice_id: voiceId, texts: getScriptPhrases(), engine: selectedEngine })
       });
       if (!res.ok) return;
       const data = await res.json();
       data.ready.forEach(t => readyPhrases.add(t));
       markReadyButtons();
-      if (data.ready.length === getScriptPhrases().length) {
-        clearInterval(cachePollingTimer);
-      }
+      if (data.ready.length === getScriptPhrases().length) clearInterval(cachePollingTimer);
     } catch {}
   }
 
@@ -758,13 +856,13 @@
     timingSet('llm', llmData.elapsed);
     addMsg(llmData.reply, 'ai');
 
-    // ③ TTS (선택된 voice_id 전달)
+    // ③ TTS (선택된 voice_id + engine 전달)
     let ttsRes;
     try {
       ttsRes = await fetch('tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: llmData.reply, voice_id: selectedVoiceId })
+        body: JSON.stringify({ text: llmData.reply, voice_id: selectedVoiceId, engine: selectedEngine })
       });
       if (!ttsRes.ok) throw new Error(await ttsRes.text());
     } catch {
@@ -815,7 +913,7 @@
       const res = await fetch('tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice_id: selectedVoiceId })
+        body: JSON.stringify({ text, voice_id: selectedVoiceId, engine: selectedEngine })
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -883,6 +981,7 @@
   }
 
   // ── Init ──────────────────────────────────────────────────────
+  loadEngines();
   loadVoices();
 </script>
 </body>
