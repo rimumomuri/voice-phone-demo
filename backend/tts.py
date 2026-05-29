@@ -28,11 +28,22 @@ def _synthesize_voxcpm(text: str, reference_wav_path: str, reference_text: str =
 
     model = _get_model()
 
+    timesteps = int(os.getenv("VOXCPM_TIMESTEPS", "10"))
     try:
         if reference_text:
-            audio = model.generate(text=text, prompt_wav_path=reference_wav_path, prompt_text=reference_text)
+            audio = model.generate(
+                text=text,
+                prompt_wav_path=reference_wav_path,
+                prompt_text=reference_text,
+                inference_timesteps=timesteps,
+                denoise=False,
+            )
         else:
-            audio = model.generate(text=text)
+            audio = model.generate(
+                text=text,
+                inference_timesteps=timesteps,
+                denoise=False,
+            )
     except Exception as e:
         raise RuntimeError(f"VoxCPM 생성 실패: {e}") from e
 
