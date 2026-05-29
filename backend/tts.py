@@ -34,26 +34,13 @@ def _synthesize_voxcpm(text: str, reference_wav_path: str, reference_text: str =
         else:
             audio = model.generate(text=text)
     except Exception as e:
-        raise RuntimeError(f"VoxCPM2 생성 실패: {e}") from e
+        raise RuntimeError(f"VoxCPM 생성 실패: {e}") from e
 
+    # generate()는 tuple이 아닌 array만 반환 → SR은 model에서 가져옴
     if isinstance(audio, tuple):
         audio, sr = audio
     else:
-        sr = 24000
-
-    import sys
-    print(f"[TTS] VoxCPM output: shape={getattr(audio, 'shape', 'N/A')}, sr={sr}, dtype={getattr(audio, 'dtype', 'N/A')}", file=sys.stderr)
-
-    # 44100Hz 리샘플링 (브라우저 호환성)
-    if sr != 44100:
-        try:
-            from scipy.signal import resample_poly
-            from math import gcd
-        except ImportError as e:
-            raise RuntimeError(f"scipy 없음: {e}. pip install scipy") from e
-        g = gcd(44100, sr)
-        audio = resample_poly(audio, 44100 // g, sr // g).astype(np.float32)
-        sr = 44100
+        sr = model.tts_model.sample_rate
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         tmp_path = f.name
