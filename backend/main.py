@@ -61,17 +61,24 @@ async def chat_endpoint(file: UploadFile = File(...)):
 
     audio_bytes = await file.read()
 
+    import time
+    t0 = time.time()
     user_text = transcribe(audio_bytes, file.filename or "audio.webm")
+    print(f"[TIMER] STT: {time.time()-t0:.1f}s", flush=True)
     if not user_text.strip():
         raise HTTPException(status_code=422, detail="音声を認識できませんでした。もう一度お試しください。")
 
+    t1 = time.time()
     reply_text, conversation_history = chat(conversation_history, user_text)
+    print(f"[TIMER] LLM: {time.time()-t1:.1f}s", flush=True)
 
     ref_text = REFERENCE_TXT.read_text(encoding="utf-8") if REFERENCE_TXT.exists() else None
+    t2 = time.time()
     try:
         wav_bytes = synthesize(reply_text, str(REFERENCE_WAV), ref_text)
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    print(f"[TIMER] TTS: {time.time()-t2:.1f}s | total: {time.time()-t0:.1f}s", flush=True)
     audio_b64 = base64.b64encode(wav_bytes).decode()
 
     return JSONResponse({
