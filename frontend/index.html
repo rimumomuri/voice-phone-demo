@@ -340,7 +340,7 @@
   async function submitVoice() {
     const form = new FormData();
     form.append('file', regBlob, 'voice.webm');
-    const res = await fetch('/register-voice', { method: 'POST', body: form });
+    const res = await fetch('register-voice', { method: 'POST', body: form });
     if (res.ok) {
       addMsg('声の登録が完了しました。', 'system', 'chat-messages');
       showChatPanel();
@@ -413,7 +413,7 @@
     form.append('file', blob, 'chat.webm');
     let sttRes;
     try {
-      sttRes = await fetch('/stt', { method: 'POST', body: form });
+      sttRes = await fetch('stt', { method: 'POST', body: form });
       if (!sttRes.ok) throw new Error(await sttRes.text());
     } catch (e) {
       micBtn.disabled = false;
@@ -427,7 +427,7 @@
     // ② LLM
     let llmRes;
     try {
-      llmRes = await fetch('/llm', {
+      llmRes = await fetch('llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: sttData.text })
@@ -445,7 +445,7 @@
     // ③ TTS
     let ttsRes;
     try {
-      ttsRes = await fetch('/tts', {
+      ttsRes = await fetch('tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: llmData.reply })
@@ -482,7 +482,7 @@
     unlockAudio();
 
     try {
-      const res = await fetch('/tts', {
+      const res = await fetch('tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })
