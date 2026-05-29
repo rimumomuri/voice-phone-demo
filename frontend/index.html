@@ -498,12 +498,34 @@
     }
   }
 
-  // ── Playback ──────────────────────────────────────────────────
+  // ── Playback (AudioContext — iOS autoplay safe) ───────────────
   let pendingB64 = null;
 
+  function b64ToBuffer(b64) {
+    const bytes = atob(b64);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    return arr.buffer;
+  }
+
+  async function playWithCtx(b64) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    const buf = await audioCtx.decodeAudioData(b64ToBuffer(b64));
+    return new Promise(resolve => {
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.onended = resolve;
+      src.start(0);
+    });
+  }
+
   async function playAudio(b64) {
-    const played = await tryAutoplay(b64);
-    if (!played) {
+    try {
+      await playWithCtx(b64);
+    } catch {
+      // AudioContext failed — fall back to tap-to-play button
       pendingB64 = b64;
       document.getElementById('btn-play-ai').classList.remove('hidden');
       document.getElementById('btn-mic').classList.add('hidden');
@@ -511,31 +533,12 @@
     }
   }
 
-  function tryAutoplay(b64) {
-    return new Promise(resolve => {
-      const bytes = atob(b64);
-      const arr = new Uint8Array(bytes.length);
-      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-      const url = URL.createObjectURL(new Blob([arr], { type: 'audio/wav' }));
-      const audio = new Audio(url);
-      audio.onended = () => { URL.revokeObjectURL(url); resolve(true); };
-      audio.onerror = () => { URL.revokeObjectURL(url); resolve(false); };
-      setTimeout(() => resolve(true), 120000);
-      audio.play().catch(() => { URL.revokeObjectURL(url); resolve(false); });
-    });
-  }
-
-  function playAudioDirect(b64) {
-    return new Promise(resolve => {
-      const bytes = atob(b64);
-      const arr = new Uint8Array(bytes.length);
-      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-      const url = URL.createObjectURL(new Blob([arr], { type: 'audio/wav' }));
-      const audio = new Audio(url);
-      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
-      audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
-      audio.play().catch(() => { URL.revokeObjectURL(url); resolve(); });
-    });
+  async function playAudioDirect(b64) {
+    try {
+      await playWithCtx(b64);
+    } catch (e) {
+      console.error('playAudioDirect failed', e);
+    }
   }
 
   function playPending() {
@@ -545,14 +548,7 @@
     document.getElementById('btn-mic').classList.remove('hidden');
     if (!pendingB64) { if (resolve) resolve(); return; }
     const b64 = pendingB64; pendingB64 = null;
-    const bytes = atob(b64);
-    const arr = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-    const url = URL.createObjectURL(new Blob([arr], { type: 'audio/wav' }));
-    const audio = new Audio(url);
-    audio.onended = () => { URL.revokeObjectURL(url); if (resolve) resolve(); };
-    audio.onerror = () => { URL.revokeObjectURL(url); if (resolve) resolve(); };
-    audio.play().catch(() => { URL.revokeObjectURL(url); if (resolve) resolve(); });
+    playWithCtx(b64).then(() => { if (resolve) resolve(); }).catch(() => { if (resolve) resolve(); });
   }
 </script>
 </body>
