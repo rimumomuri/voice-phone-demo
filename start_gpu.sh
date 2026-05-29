@@ -37,6 +37,21 @@ echo " ※ 첫 실행 시 VoxCPM2 모델을 다운로드합니다 (수 GB, 5~10�
 echo "================================================"
 echo ""
 
+# witts-sol.com 도메인 연결 (역방향 SSH 터널)
+VPS_HOST="root@153.122.4.97"
+VPS_PORT=8889
+if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -q "$VPS_HOST" exit 2>/dev/null; then
+    echo " → witts-sol.com 터널 시작 (localhost:$PORT → VPS:$VPS_PORT)"
+    nohup bash -c "while true; do
+        ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+            -N -R ${VPS_PORT}:localhost:${PORT} ${VPS_HOST}
+        sleep 5
+    done" > /tmp/tunnel.log 2>&1 &
+    echo " → 터널 PID: $!"
+else
+    echo " → VPS 연결 불가 (터널 없이 실행)"
+fi
+
 cd "$BACKEND_DIR"
 TTS_ENGINE=voxcpm "$VENV_PYTHON" -m uvicorn main:app \
     --host 0.0.0.0 \
