@@ -18,6 +18,7 @@
       margin: 0 auto;
     }
 
+    /* Header */
     .header {
       background: #fff;
       padding: 14px 18px 12px;
@@ -28,12 +29,66 @@
       flex-shrink: 0;
     }
     .header-title { font-size: 16px; font-weight: 600; color: #111; }
-    .badge {
-      font-size: 11px; font-weight: 600;
-      padding: 4px 10px; border-radius: 20px; letter-spacing: 0.2px;
+
+    /* Voice strip */
+    .voice-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #fff;
+      border-bottom: 1px solid #e5e5ea;
+      overflow-x: auto;
+      flex-shrink: 0;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
     }
-    .badge-pending { background: #fff3cd; color: #856404; }
-    .badge-done    { background: #d1e7dd; color: #0a3622; }
+    .voice-strip::-webkit-scrollbar { display: none; }
+    .voice-strip-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+      color: #aaa; flex-shrink: 0; text-transform: uppercase;
+    }
+    .voice-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 8px 6px 12px;
+      border-radius: 20px;
+      border: 1.5px solid #e5e5ea;
+      background: #f7f7f7;
+      font-size: 13px;
+      font-weight: 500;
+      color: #555;
+      white-space: nowrap;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .voice-chip.selected {
+      background: #1c1c1e;
+      color: #fff;
+      border-color: #1c1c1e;
+    }
+    .chip-icon {
+      width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; cursor: pointer; flex-shrink: 0;
+      background: rgba(0,0,0,0.08);
+    }
+    .voice-chip.selected .chip-icon { background: rgba(255,255,255,0.2); }
+    .chip-icon:active { opacity: 0.6; }
+    .voice-chip-add {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1.5px dashed #ccc;
+      background: #fff;
+      font-size: 13px; font-weight: 500; color: #888;
+      cursor: pointer; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .voice-chip-add:active { background: #f5f5f5; }
 
     /* Tabs */
     .tabs {
@@ -81,7 +136,7 @@
     }
     .timing-label { color: #888; width: 100px; flex-shrink: 0; }
     .timing-bar-wrap { flex: 1; height: 4px; background: #f0f0f0; border-radius: 2px; overflow: hidden; }
-    .timing-bar { height: 100%; border-radius: 2px; background: #1c1c1e; width: 0; transition: width 0.4s; }
+    .timing-bar { height: 100%; border-radius: 2px; width: 0; transition: width 0.4s; }
     .timing-bar.stt  { background: #5856d6; }
     .timing-bar.llm  { background: #ff9500; }
     .timing-bar.tts  { background: #34c759; }
@@ -94,17 +149,7 @@
       padding: 16px 20px 32px; flex-shrink: 0;
     }
 
-    /* Registration */
-    .reg-label {
-      font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
-      text-transform: uppercase; color: #aaa; margin-bottom: 10px;
-    }
-    .reg-script {
-      background: #f7f7f7; border-left: 3px solid #d0d0d0;
-      padding: 10px 14px; font-size: 13px; color: #444;
-      line-height: 1.65; border-radius: 0 8px 8px 0; margin-bottom: 14px;
-    }
-    .reg-actions { display: flex; gap: 8px; }
+    /* Buttons */
     .btn {
       border: none; border-radius: 10px; cursor: pointer;
       font-size: 14px; font-weight: 500; padding: 11px 18px;
@@ -129,7 +174,7 @@
       -webkit-tap-highlight-color: transparent; user-select: none;
     }
     .mic-btn.recording { background: #c0392b; transform: scale(0.94); }
-    .mic-btn:disabled  { opacity: 0.35; }
+    .mic-btn:disabled  { opacity: 0.35; cursor: not-allowed; }
     .mic-btn svg { width: 26px; height: 26px; fill: #fff; }
     .mic-hint { font-size: 12px; color: #aaa; }
     .btn-play-ai {
@@ -165,6 +210,57 @@
     .script-btn .play-icon svg { width: 14px; height: 14px; fill: #fff; }
     .script-btn .script-text { flex: 1; }
 
+    /* Registration overlay (bottom sheet) */
+    .reg-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.45);
+      display: flex; align-items: flex-end;
+      animation: fadeIn 0.15s;
+    }
+    .reg-overlay.hidden { display: none; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .reg-sheet {
+      background: #fff;
+      border-radius: 20px 20px 0 0;
+      padding: 20px 20px 44px;
+      width: 100%; max-width: 480px;
+      margin: 0 auto;
+      animation: slideUp 0.2s ease-out;
+    }
+    @keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .reg-sheet-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .reg-sheet-title { font-size: 16px; font-weight: 700; color: #111; }
+    .reg-sheet-close {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #f0f0f0; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: #555; line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .reg-script-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+      text-transform: uppercase; color: #aaa;
+      margin-bottom: 8px; margin-top: 16px;
+    }
+    .reg-script {
+      background: #f7f7f7; border-left: 3px solid #d0d0d0;
+      padding: 10px 14px; font-size: 13px; color: #444;
+      line-height: 1.65; border-radius: 0 8px 8px 0; margin-bottom: 14px;
+    }
+    .reg-name-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+    }
+    .reg-name-label { font-size: 13px; color: #555; flex-shrink: 0; }
+    .reg-name-input {
+      flex: 1; border: 1px solid #e5e5ea; border-radius: 8px;
+      padding: 8px 12px; font-size: 14px; color: #111; outline: none;
+    }
+    .reg-name-input:focus { border-color: #1c1c1e; }
+    .reg-actions { display: flex; gap: 8px; }
+
     .hidden { display: none !important; }
   </style>
 </head>
@@ -172,38 +268,25 @@
 
 <div class="header">
   <span class="header-title">AI 電話対応デモ</span>
-  <span class="badge badge-pending" id="voice-badge">声 未登録</span>
 </div>
 
-<!-- Tabs (登録後に表示) -->
-<div class="tabs hidden" id="tabs">
+<!-- Voice strip (always visible) -->
+<div class="voice-strip" id="voice-strip">
+  <!-- populated by JS -->
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
   <div class="tab active" id="tab-chat" onclick="switchTab('chat')">AI 会話</div>
   <div class="tab" id="tab-script" onclick="switchTab('script')">スクリプト</div>
 </div>
 
-<!-- ========== Panel: 声登録 ========== -->
-<div class="panel active" id="panel-reg">
-  <div class="chat-area" id="chat-area">
-    <div class="msg msg-system">まず声を登録してください</div>
-  </div>
-  <div class="bottom">
-    <div class="reg-label">Step 1 — 声を登録する</div>
-    <div class="reg-script">「こんにちは。本日はお電話いただきありがとうございます。少々お待ちください。どのようなご用件でしょうか。」</div>
-    <div class="reg-actions">
-      <button class="btn btn-dark" id="btn-rec" onclick="toggleRegister()">録音開始</button>
-      <button class="btn btn-light hidden" id="btn-preview" onclick="previewVoice()">確認</button>
-      <button class="btn btn-light hidden" id="btn-register" onclick="submitVoice()">登録</button>
-    </div>
-  </div>
-</div>
-
 <!-- ========== Panel: AI 会話 ========== -->
-<div class="panel" id="panel-chat">
+<div class="panel active" id="panel-chat">
   <div class="chat-area" id="chat-messages">
-    <div class="msg msg-system">話しかけてみてください</div>
+    <div class="msg msg-system" id="chat-no-voice-hint">声を選択してから話しかけてください</div>
   </div>
 
-  <!-- 処理タイミング表示 -->
   <div class="timing-card hidden" id="timing-card">
     <div class="timing-row">
       <span class="timing-label">Whisper (STT)</span>
@@ -225,17 +308,17 @@
   <div class="bottom">
     <div class="mic-area">
       <button class="btn-play-ai hidden" id="btn-play-ai" onclick="playPending()">タップして再生</button>
-      <button class="mic-btn" id="btn-mic" onclick="toggleChat()">
+      <button class="mic-btn" id="btn-mic" onclick="toggleChat()" disabled>
         <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"/></svg>
       </button>
-      <span class="mic-hint" id="mic-hint">タップして話す</span>
+      <span class="mic-hint" id="mic-hint">声を選択してください</span>
     </div>
   </div>
 </div>
 
 <!-- ========== Panel: スクリプト ========== -->
 <div class="panel" id="panel-script">
-  <div class="script-area" id="script-area">
+  <div class="script-area">
     <div class="script-section-title">受付フレーズ</div>
 
     <button class="script-btn" onclick="playScript(this, 'はい、お電話ありがとうございます。ご用件をお聞かせください。')">
@@ -277,12 +360,44 @@
   </div>
 </div>
 
+<!-- ========== Registration bottom sheet ========== -->
+<div class="reg-overlay hidden" id="reg-overlay" onclick="handleOverlayBg(event)">
+  <div class="reg-sheet" id="reg-sheet">
+    <div class="reg-sheet-header">
+      <span class="reg-sheet-title">新しい声を登録</span>
+      <button class="reg-sheet-close" onclick="closeRegOverlay()">✕</button>
+    </div>
+
+    <div class="reg-script-label">以下のフレーズを読み上げてください</div>
+    <div class="reg-script">「こんにちは。本日はお電話いただきありがとうございます。少々お待ちください。どのようなご用件でしょうか。」</div>
+
+    <div class="reg-name-row">
+      <span class="reg-name-label">名前</span>
+      <input class="reg-name-input" id="reg-name-input" type="text" placeholder="例: 田中さん" maxlength="20">
+    </div>
+
+    <div class="reg-actions">
+      <button class="btn btn-dark" id="btn-rec" onclick="toggleRegister()">録音開始</button>
+      <button class="btn btn-light hidden" id="btn-preview" onclick="previewVoice()">確認</button>
+      <button class="btn btn-light hidden" id="btn-register" onclick="submitVoice()">登録</button>
+    </div>
+  </div>
+</div>
+
 <script>
-  let recorder = null, chunks = [], regBlob = null, chatStream = null, audioCtx = null;
+  // State
+  let recorder = null, chunks = [], regBlob = null;
+  let chatStream = null, audioCtx = null;
+  let selectedVoiceId = null;
+  let voices = [];
 
   function unlockAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   // ── Tabs ──────────────────────────────────────────────────────
@@ -293,15 +408,110 @@
     });
   }
 
-  function showChatPanel() {
-    document.getElementById('panel-reg').classList.remove('active');
-    document.getElementById('tabs').classList.remove('hidden');
-    document.getElementById('panel-chat').classList.add('active');
-    document.getElementById('voice-badge').textContent = '声 登録済';
-    document.getElementById('voice-badge').className = 'badge badge-done';
+  // ── Voice strip ───────────────────────────────────────────────
+  async function loadVoices() {
+    try {
+      const res = await fetch('voices');
+      voices = res.ok ? await res.json() : [];
+    } catch { voices = []; }
+    renderVoiceStrip();
+    if (!selectedVoiceId && voices.length > 0) {
+      selectVoice(voices[0].id, false);
+    }
   }
 
-  // ── Voice registration ────────────────────────────────────────
+  function renderVoiceStrip() {
+    const strip = document.getElementById('voice-strip');
+    strip.innerHTML = '';
+
+    const label = document.createElement('span');
+    label.className = 'voice-strip-label';
+    label.textContent = '声';
+    strip.appendChild(label);
+
+    voices.forEach(v => {
+      const chip = document.createElement('div');
+      chip.className = 'voice-chip' + (v.id === selectedVoiceId ? ' selected' : '');
+      chip.innerHTML =
+        `<span>${escHtml(v.name)}</span>` +
+        `<span class="chip-icon" title="試聴" data-play="${v.id}">▶</span>` +
+        `<span class="chip-icon" title="削除" data-del="${v.id}">✕</span>`;
+      chip.querySelector('[data-play]').addEventListener('click', e => { e.stopPropagation(); previewVoiceChip(v.id); });
+      chip.querySelector('[data-del]').addEventListener('click', e => { e.stopPropagation(); deleteVoice(v.id, v.name); });
+      chip.addEventListener('click', () => selectVoice(v.id, true));
+      strip.appendChild(chip);
+    });
+
+    const addBtn = document.createElement('div');
+    addBtn.className = 'voice-chip-add';
+    addBtn.onclick = openRegOverlay;
+    addBtn.innerHTML =
+      `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>` +
+      `録音`;
+    strip.appendChild(addBtn);
+  }
+
+  function selectVoice(id, showMsg) {
+    selectedVoiceId = id;
+    renderVoiceStrip();
+    const hasVoice = !!selectedVoiceId;
+    document.getElementById('chat-no-voice-hint').style.display = hasVoice ? 'none' : '';
+    document.getElementById('btn-mic').disabled = !hasVoice;
+    document.getElementById('mic-hint').textContent = hasVoice ? 'タップして話す' : '声を選択してください';
+    if (showMsg && id) {
+      const v = voices.find(v => v.id === id);
+      if (v) addMsg(`「${v.name}」を使用します。`, 'system');
+    }
+  }
+
+  async function deleteVoice(id, name) {
+    if (!confirm(`「${name}」を削除しますか？`)) return;
+    try {
+      await fetch('voices/' + id, { method: 'DELETE' });
+    } catch {}
+    if (selectedVoiceId === id) selectedVoiceId = null;
+    await loadVoices();
+    if (!selectedVoiceId && voices.length > 0) selectVoice(voices[0].id, false);
+    else selectVoice(selectedVoiceId, false);
+  }
+
+  async function previewVoiceChip(id) {
+    unlockAudio();
+    try {
+      const res = await fetch('voices/' + id + '/audio');
+      if (!res.ok) return;
+      const buf = await res.arrayBuffer();
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      const decoded = await audioCtx.decodeAudioData(buf);
+      const src = audioCtx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch (e) { console.error(e); }
+  }
+
+  // ── Registration overlay ──────────────────────────────────────
+  function openRegOverlay() {
+    regBlob = null;
+    document.getElementById('btn-preview').classList.add('hidden');
+    document.getElementById('btn-register').classList.add('hidden');
+    const rec = document.getElementById('btn-rec');
+    rec.textContent = '録音開始'; rec.style.background = ''; rec.disabled = false;
+    document.getElementById('reg-name-input').value = '';
+    document.getElementById('reg-overlay').classList.remove('hidden');
+  }
+
+  function closeRegOverlay() {
+    if (recorder && recorder.state === 'recording') recorder.stop();
+    document.getElementById('reg-overlay').classList.add('hidden');
+  }
+
+  function handleOverlayBg(e) {
+    if (e.target === document.getElementById('reg-overlay')) closeRegOverlay();
+  }
+
+  // ── Voice recording ───────────────────────────────────────────
   async function toggleRegister() {
     const btn = document.getElementById('btn-rec');
     if (recorder && recorder.state === 'recording') {
@@ -338,17 +548,37 @@
   }
 
   async function submitVoice() {
-    const form = new FormData();
-    form.append('file', regBlob, 'voice.webm');
-    const res = await fetch('register-voice', { method: 'POST', body: form });
-    if (res.ok) {
-      addMsg('声の登録が完了しました。', 'system', 'chat-messages');
-      showChatPanel();
+    if (!regBlob) return;
+    const btn = document.getElementById('btn-register');
+    btn.disabled = true;
+    btn.textContent = '登録中...';
+    const name = document.getElementById('reg-name-input').value.trim() || ('声' + (voices.length + 1));
+    try {
+      const form = new FormData();
+      form.append('file', regBlob, 'voice.webm');
+      form.append('name', name);
+      const res = await fetch('register-voice', { method: 'POST', body: form });
+      if (res.ok) {
+        const data = await res.json();
+        closeRegOverlay();
+        await loadVoices();
+        selectVoice(data.id, false);
+        addMsg(`「${data.name}」の声を登録しました。`, 'system');
+      } else {
+        const err = await res.text().catch(() => String(res.status));
+        alert('登録に失敗しました: ' + err);
+        btn.disabled = false;
+        btn.textContent = '登録';
+      }
+    } catch (e) {
+      alert('通信エラー: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '登録';
     }
   }
 
-  function addMsg(text, type, containerId = 'chat-messages') {
-    const area = document.getElementById(containerId);
+  function addMsg(text, type) {
+    const area = document.getElementById('chat-messages');
     const d = document.createElement('div');
     d.className = 'msg msg-' + type;
     d.textContent = text;
@@ -373,12 +603,8 @@
     const pct = Math.min(100, (seconds / maxTiming) * 100);
     document.getElementById('bar-' + key).style.width = pct + '%';
     document.getElementById('val-' + key).textContent = seconds + 's';
-    if (key === 'stt') {
-      document.getElementById('val-llm').innerHTML = '<span class="timing-spin">...</span>';
-    }
-    if (key === 'llm') {
-      document.getElementById('val-tts').innerHTML = '<span class="timing-spin">...</span>';
-    }
+    if (key === 'stt') document.getElementById('val-llm').innerHTML = '<span class="timing-spin">...</span>';
+    if (key === 'llm') document.getElementById('val-tts').innerHTML = '<span class="timing-spin">...</span>';
   }
 
   // ── Chat ──────────────────────────────────────────────────────
@@ -415,7 +641,7 @@
     try {
       sttRes = await fetch('stt', { method: 'POST', body: form });
       if (!sttRes.ok) throw new Error(await sttRes.text());
-    } catch (e) {
+    } catch {
       micBtn.disabled = false;
       document.getElementById('val-stt').textContent = 'ERR';
       return;
@@ -433,7 +659,7 @@
         body: JSON.stringify({ text: sttData.text })
       });
       if (!llmRes.ok) throw new Error(await llmRes.text());
-    } catch (e) {
+    } catch {
       micBtn.disabled = false;
       document.getElementById('val-llm').textContent = 'ERR';
       return;
@@ -442,16 +668,16 @@
     timingSet('llm', llmData.elapsed);
     addMsg(llmData.reply, 'ai');
 
-    // ③ TTS
+    // ③ TTS (선택된 voice_id 전달)
     let ttsRes;
     try {
       ttsRes = await fetch('tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: llmData.reply })
+        body: JSON.stringify({ text: llmData.reply, voice_id: selectedVoiceId })
       });
       if (!ttsRes.ok) throw new Error(await ttsRes.text());
-    } catch (e) {
+    } catch {
       micBtn.disabled = false;
       document.getElementById('val-tts').textContent = 'ERR';
       return;
@@ -459,7 +685,6 @@
     const ttsData = await ttsRes.json();
     timingSet('tts', ttsData.elapsed);
 
-    // adjust bar scale to actual max
     const times = [sttData.elapsed, llmData.elapsed, ttsData.elapsed];
     maxTiming = Math.max(...times) * 1.2;
     ['stt','llm','tts'].forEach((k, i) => {
@@ -474,9 +699,11 @@
   let activeScriptBtn = null;
 
   async function playScript(btn, text) {
-    if (activeScriptBtn) {
-      activeScriptBtn.classList.remove('playing');
+    if (!selectedVoiceId) {
+      alert('声を選択してください。');
+      return;
     }
+    if (activeScriptBtn) activeScriptBtn.classList.remove('playing');
     btn.classList.add('playing');
     activeScriptBtn = btn;
     unlockAudio();
@@ -485,7 +712,7 @@
       const res = await fetch('tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, voice_id: selectedVoiceId })
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -525,7 +752,6 @@
     try {
       await playWithCtx(b64);
     } catch {
-      // AudioContext failed — fall back to tap-to-play button
       pendingB64 = b64;
       document.getElementById('btn-play-ai').classList.remove('hidden');
       document.getElementById('btn-mic').classList.add('hidden');
@@ -536,9 +762,7 @@
   async function playAudioDirect(b64) {
     try {
       await playWithCtx(b64);
-    } catch (e) {
-      console.error('playAudioDirect failed', e);
-    }
+    } catch (e) { console.error('playAudioDirect failed', e); }
   }
 
   function playPending() {
@@ -550,6 +774,9 @@
     const b64 = pendingB64; pendingB64 = null;
     playWithCtx(b64).then(() => { if (resolve) resolve(); }).catch(() => { if (resolve) resolve(); });
   }
+
+  // ── Init ──────────────────────────────────────────────────────
+  loadVoices();
 </script>
 </body>
 </html>

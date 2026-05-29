@@ -5,4 +5,5 @@ __pycache__/
 .venv/
 backend/reference_voice/user.wav
 backend/reference_voice/user.txt
+backend/reference_voices/
 .pytest_cache/

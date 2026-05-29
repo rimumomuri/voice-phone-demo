@@ -1,9 +1,14 @@
 import base64
 import io
+import json
 import os
+import shutil
 import sys
 import time
+import uuid
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -13,7 +18,7 @@ if not _api_key or _api_key == "sk-...":
     print("ERROR: OPENAI_API_KEY が設定されていません。", file=sys.stderr)
     sys.exit(1)
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Body
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydub import AudioSegment
@@ -26,11 +31,40 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 BACKEND_DIR = Path(__file__).parent
-REFERENCE_WAV = BACKEND_DIR / "reference_voice" / "user.wav"
-REFERENCE_TXT = BACKEND_DIR / "reference_voice" / "user.txt"
+VOICES_DIR = BACKEND_DIR / "reference_voices"
+VOICES_DIR.mkdir(exist_ok=True)
 FRONTEND_DIR = BACKEND_DIR.parent / "frontend"
 
+# Migrate old single-voice storage → new multi-voice format (runs once)
+_old_wav = BACKEND_DIR / "reference_voice" / "user.wav"
+if _old_wav.exists():
+    _mig_dir = VOICES_DIR / "default"
+    _mig_dir.mkdir(exist_ok=True)
+    if not (_mig_dir / "voice.wav").exists():
+        shutil.copy2(_old_wav, _mig_dir / "voice.wav")
+        _old_txt = _old_wav.parent / "user.txt"
+        if _old_txt.exists():
+            shutil.copy2(_old_txt, _mig_dir / "voice.txt")
+        meta = {"name": "デフォルト", "created_at": datetime.now().isoformat()}
+        (_mig_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False))
+
 conversation_history: list[Message] = []
+
+
+def _get_voice_dir(voice_id: Optional[str]) -> Optional[Path]:
+    if voice_id:
+        d = VOICES_DIR / voice_id
+        if d.is_dir() and (d / "voice.wav").exists():
+            return d
+    # fallback: most recently modified voice
+    dirs = [d for d in VOICES_DIR.iterdir() if d.is_dir() and (d / "voice.wav").exists()]
+    if dirs:
+        return max(dirs, key=lambda p: p.stat().st_mtime)
+    # final fallback: old single-voice location
+    old = BACKEND_DIR / "reference_voice" / "user.wav"
+    if old.exists():
+        return old.parent
+    return None
 
 
 @app.get("/health")
@@ -38,19 +72,64 @@ def health():
     return {"status": "ok"}
 
 
+# ── Voice management ──────────────────────────────────────────────────────────
+
+@app.get("/voices")
+def list_voices():
+    voices = []
+    for d in VOICES_DIR.iterdir():
+        if not d.is_dir() or not (d / "voice.wav").exists():
+            continue
+        meta_path = d / "meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+        voices.append({
+            "id": d.name,
+            "name": meta.get("name", d.name),
+            "created_at": meta.get("created_at", ""),
+        })
+    voices.sort(key=lambda v: v["created_at"], reverse=True)
+    return JSONResponse(voices)
+
+
+@app.get("/voices/{voice_id}/audio")
+def get_voice_audio(voice_id: str):
+    wav_path = VOICES_DIR / voice_id / "voice.wav"
+    if not wav_path.exists():
+        raise HTTPException(status_code=404, detail="Voice not found")
+    return FileResponse(str(wav_path), media_type="audio/wav")
+
+
 @app.post("/register-voice")
-async def register_voice(file: UploadFile = File(...)):
+async def register_voice(file: UploadFile = File(...), name: str = Form("声")):
     audio_bytes = await file.read()
     try:
         audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"音声ファイルの解析に失敗しました: {e}")
     audio = audio.set_frame_rate(24000).set_channels(1)
-    REFERENCE_WAV.parent.mkdir(exist_ok=True)
-    audio.export(str(REFERENCE_WAV), format="wav")
+
+    voice_id = uuid.uuid4().hex[:8]
+    voice_dir = VOICES_DIR / voice_id
+    voice_dir.mkdir(exist_ok=True)
+    audio.export(str(voice_dir / "voice.wav"), format="wav")
+
     ref_text = transcribe(audio_bytes, file.filename or "voice.webm")
-    REFERENCE_TXT.write_text(ref_text, encoding="utf-8")
-    return {"status": "ok"}
+    (voice_dir / "voice.txt").write_text(ref_text, encoding="utf-8")
+
+    label = name.strip() or "声"
+    meta = {"name": label, "created_at": datetime.now().isoformat()}
+    (voice_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False))
+
+    return JSONResponse({"id": voice_id, "name": meta["name"], "created_at": meta["created_at"]})
+
+
+@app.delete("/voices/{voice_id}")
+def delete_voice(voice_id: str):
+    voice_dir = VOICES_DIR / voice_id
+    if not voice_dir.exists():
+        raise HTTPException(status_code=404, detail="Voice not found")
+    shutil.rmtree(voice_dir)
+    return JSONResponse({"status": "deleted"})
 
 
 # ── 분리된 엔드포인트 ─────────────────────────────────────────────────────────
@@ -81,14 +160,16 @@ async def llm_endpoint(body: dict = Body(...)):
 @app.post("/tts")
 async def tts_endpoint(body: dict = Body(...)):
     text = body.get("text", "")
+    voice_id = body.get("voice_id")
     if not text.strip():
         raise HTTPException(status_code=422, detail="テキストが空です。")
-    if not REFERENCE_WAV.exists():
+    voice_dir = _get_voice_dir(voice_id)
+    if voice_dir is None:
         raise HTTPException(status_code=400, detail="声が登録されていません。")
-    ref_text = REFERENCE_TXT.read_text(encoding="utf-8") if REFERENCE_TXT.exists() else None
+    ref_text = (voice_dir / "voice.txt").read_text(encoding="utf-8") if (voice_dir / "voice.txt").exists() else None
     t0 = time.time()
     try:
-        wav_bytes = synthesize(text, str(REFERENCE_WAV), ref_text)
+        wav_bytes = synthesize(text, str(voice_dir / "voice.wav"), ref_text)
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
     elapsed = round(time.time() - t0, 2)
@@ -101,9 +182,10 @@ async def tts_endpoint(body: dict = Body(...)):
 @app.post("/chat")
 async def chat_endpoint(file: UploadFile = File(...)):
     global conversation_history
-    if not REFERENCE_WAV.exists():
-        raise HTTPException(status_code=400, detail="声が登録されていません。先に声を登録してください。")
     audio_bytes = await file.read()
+    voice_dir = _get_voice_dir(None)
+    if voice_dir is None:
+        raise HTTPException(status_code=400, detail="声が登録されていません。先に声を登録してください。")
     t0 = time.time()
     user_text = transcribe(audio_bytes, file.filename or "audio.webm")
     t1 = time.time()
@@ -111,9 +193,9 @@ async def chat_endpoint(file: UploadFile = File(...)):
         raise HTTPException(status_code=422, detail="音声を認識できませんでした。もう一度お試しください。")
     reply_text, conversation_history = chat(conversation_history, user_text)
     t2 = time.time()
-    ref_text = REFERENCE_TXT.read_text(encoding="utf-8") if REFERENCE_TXT.exists() else None
+    ref_text = (voice_dir / "voice.txt").read_text(encoding="utf-8") if (voice_dir / "voice.txt").exists() else None
     try:
-        wav_bytes = synthesize(reply_text, str(REFERENCE_WAV), ref_text)
+        wav_bytes = synthesize(reply_text, str(voice_dir / "voice.wav"), ref_text)
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
     t3 = time.time()
