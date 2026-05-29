@@ -208,7 +208,20 @@
     .script-btn .play-icon { width: 28px; height: 28px; border-radius: 50%; background: #1c1c1e; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .script-btn.playing .play-icon { background: #34c759; }
     .script-btn .play-icon svg { width: 14px; height: 14px; fill: #fff; }
-    .script-btn .script-text { flex: 1; }
+    .script-btn .script-text-wrap { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .script-btn .script-text { line-height: 1.45; }
+    /* Script cache states */
+    @keyframes tts-spin { to { transform: rotate(360deg); } }
+    .script-btn.loading .play-icon { background: #ff9500; }
+    .script-btn.loading .play-icon svg { animation: tts-spin 0.9s linear infinite; transform-origin: center; }
+    .script-btn.loading { pointer-events: none; }
+    .script-btn.tts-ready .play-icon { background: #1a6b3a; }
+    .script-status {
+      font-size: 10px; color: #aaa; letter-spacing: 0.3px;
+      margin-top: 2px;
+    }
+    .script-btn.loading .script-status { color: #ff9500; }
+    .script-btn.tts-ready .script-status { color: #1a6b3a; }
 
     /* Registration overlay (bottom sheet) */
     .reg-overlay {
@@ -321,41 +334,62 @@
   <div class="script-area">
     <div class="script-section-title">受付フレーズ</div>
 
-    <button class="script-btn" onclick="playScript(this, 'はい、お電話ありがとうございます。ご用件をお聞かせください。')">
+    <button class="script-btn" data-text="はい、お電話ありがとうございます。ご用件をお聞かせください。" onclick="playScript(this)">
       <div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-      <span class="script-text">はい、お電話ありがとうございます。ご用件をお聞かせください。</span>
+      <div class="script-text-wrap">
+        <span class="script-text">はい、お電話ありがとうございます。ご用件をお聞かせください。</span>
+        <span class="script-status"></span>
+      </div>
     </button>
 
-    <button class="script-btn" onclick="playScript(this, '少々お待ちください。担当者に確認いたします。')">
+    <button class="script-btn" data-text="少々お待ちください。担当者に確認いたします。" onclick="playScript(this)">
       <div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-      <span class="script-text">少々お待ちください。担当者に確認いたします。</span>
+      <div class="script-text-wrap">
+        <span class="script-text">少々お待ちください。担当者に確認いたします。</span>
+        <span class="script-status"></span>
+      </div>
     </button>
 
-    <button class="script-btn" onclick="playScript(this, 'ご予約の日時を教えていただけますか。')">
+    <button class="script-btn" data-text="ご予約の日時を教えていただけますか。" onclick="playScript(this)">
       <div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-      <span class="script-text">ご予約の日時を教えていただけますか。</span>
+      <div class="script-text-wrap">
+        <span class="script-text">ご予約の日時を教えていただけますか。</span>
+        <span class="script-status"></span>
+      </div>
     </button>
 
-    <button class="script-btn" onclick="playScript(this, 'かしこまりました。ご予約を承りました。当日お待ちしております。')">
+    <button class="script-btn" data-text="かしこまりました。ご予約を承りました。当日お待ちしております。" onclick="playScript(this)">
       <div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-      <span class="script-text">かしこまりました。ご予約を承りました。当日お待ちしております。</span>
+      <div class="script-text-wrap">
+        <span class="script-text">かしこまりました。ご予約を承りました。当日お待ちしております。</span>
+        <span class="script-status"></span>
+      </div>
     </button>
 
-    <button class="script-btn" onclick="playScript(this, 'ありがとうございました。またのお電話をお待ちしております。失礼いたします。')">
+    <button class="script-btn" data-text="ありがとうございました。またのお電話をお待ちしております。失礼いたします。" onclick="playScript(this)">
       <div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-      <span class="script-text">ありがとうございました。またのお電話をお待ちしております。失礼いたします。</span>
+      <div class="script-text-wrap">
+        <span class="script-text">ありがとうございました。またのお電話をお待ちしております。失礼いたします。</span>
+        <span class="script-status"></span>
+      </div>
     </button>
 
     <div class="script-section-title" style="margin-top:8px;">クレーム対応</div>
 
-    <button class="script-btn" onclick="playScript(this, 'ご不便をおかけし、大変申し訳ございません。')">
+    <button class="script-btn" data-text="ご不便をおかけし、大変申し訳ございません。" onclick="playScript(this)">
       <div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-      <span class="script-text">ご不便をおかけし、大変申し訳ございません。</span>
+      <div class="script-text-wrap">
+        <span class="script-text">ご不便をおかけし、大変申し訳ございません。</span>
+        <span class="script-status"></span>
+      </div>
     </button>
 
-    <button class="script-btn" onclick="playScript(this, '状況を確認の上、折り返しご連絡いたします。')">
+    <button class="script-btn" data-text="状況を確認の上、折り返しご連絡いたします。" onclick="playScript(this)">
       <div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-      <span class="script-text">状況を確認の上、折り返しご連絡いたします。</span>
+      <div class="script-text-wrap">
+        <span class="script-text">状況を確認の上、折り返しご連絡いたします。</span>
+        <span class="script-status"></span>
+      </div>
     </button>
   </div>
 </div>
@@ -390,6 +424,8 @@
   let chatStream = null, audioCtx = null;
   let selectedVoiceId = null;
   let voices = [];
+  const readyPhrases = new Set();
+  let cachePollingTimer = null;
 
   function unlockAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -462,6 +498,60 @@
       const v = voices.find(v => v.id === id);
       if (v) addMsg(`「${v.name}」を使用します。`, 'system');
     }
+    // キャッシュ関連リセット & warm-up
+    readyPhrases.clear();
+    markReadyButtons();
+    if (id) startWarmCache(id);
+  }
+
+  // ── Script cache management ───────────────────────────────────
+  function getScriptPhrases() {
+    return Array.from(document.querySelectorAll('.script-btn[data-text]')).map(b => b.dataset.text);
+  }
+
+  async function startWarmCache(voiceId) {
+    if (cachePollingTimer) clearInterval(cachePollingTimer);
+    const phrases = getScriptPhrases();
+    try {
+      await fetch('voices/' + voiceId + '/warm-cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts: phrases })
+      });
+    } catch {}
+    // Poll every 15s to check which phrases are ready
+    await checkCacheStatus(voiceId);
+    cachePollingTimer = setInterval(() => checkCacheStatus(voiceId), 15000);
+    // Stop polling after 10 minutes
+    setTimeout(() => { if (cachePollingTimer) clearInterval(cachePollingTimer); }, 600000);
+  }
+
+  async function checkCacheStatus(voiceId) {
+    if (!voiceId) return;
+    try {
+      const res = await fetch('tts/cache-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voice_id: voiceId, texts: getScriptPhrases() })
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      data.ready.forEach(t => readyPhrases.add(t));
+      markReadyButtons();
+      if (data.ready.length === getScriptPhrases().length) {
+        clearInterval(cachePollingTimer);
+      }
+    } catch {}
+  }
+
+  function markReadyButtons() {
+    document.querySelectorAll('.script-btn[data-text]').forEach(btn => {
+      const text = btn.dataset.text;
+      const isReady = readyPhrases.has(text);
+      btn.classList.toggle('tts-ready', isReady);
+      const statusEl = btn.querySelector('.script-status');
+      if (statusEl) statusEl.textContent = isReady ? '準備完了 — すぐ再生' : '';
+    });
   }
 
   async function deleteVoice(id, name) {
@@ -698,15 +788,28 @@
   // ── Script playback ───────────────────────────────────────────
   let activeScriptBtn = null;
 
-  async function playScript(btn, text) {
+  async function playScript(btn) {
     if (!selectedVoiceId) {
       alert('声を選択してください。');
       return;
     }
-    if (activeScriptBtn) activeScriptBtn.classList.remove('playing');
-    btn.classList.add('playing');
+    if (btn.classList.contains('loading')) return;
+    const text = btn.dataset.text;
+    if (!text) return;
+
+    if (activeScriptBtn && activeScriptBtn !== btn) activeScriptBtn.classList.remove('playing');
     activeScriptBtn = btn;
     unlockAudio();
+
+    const statusEl = btn.querySelector('.script-status');
+    const isCached = readyPhrases.has(text);
+
+    if (!isCached) {
+      btn.classList.add('loading');
+      if (statusEl) statusEl.textContent = '生成中...';
+    } else {
+      btn.classList.add('playing');
+    }
 
     try {
       const res = await fetch('tts', {
@@ -716,11 +819,15 @@
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
+      readyPhrases.add(text);
+      markReadyButtons();
+      btn.classList.remove('loading');
+      btn.classList.add('playing');
       await playAudioDirect(data.audio_base64);
     } catch (e) {
       console.error(e);
     } finally {
-      btn.classList.remove('playing');
+      btn.classList.remove('loading', 'playing');
       if (activeScriptBtn === btn) activeScriptBtn = null;
     }
   }

@@ -1,9 +1,11 @@
 import base64
+import hashlib
 import io
 import json
 import os
 import shutil
 import sys
+import threading
 import time
 import uuid
 from datetime import datetime
@@ -49,6 +51,13 @@ if _old_wav.exists():
         (_mig_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False))
 
 conversation_history: list[Message] = []
+
+
+def _tts_cache_path(voice_dir: Path, text: str) -> Path:
+    cache_dir = voice_dir / "cache"
+    cache_dir.mkdir(exist_ok=True)
+    text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()[:16]
+    return cache_dir / f"{text_hash}.wav"
 
 
 def _get_voice_dir(voice_id: Optional[str]) -> Optional[Path]:
@@ -166,6 +175,13 @@ async def tts_endpoint(body: dict = Body(...)):
     voice_dir = _get_voice_dir(voice_id)
     if voice_dir is None:
         raise HTTPException(status_code=400, detail="声が登録されていません。")
+
+    # キャッシュ確認
+    cache_file = _tts_cache_path(voice_dir, text)
+    if cache_file.exists():
+        audio_b64 = base64.b64encode(cache_file.read_bytes()).decode()
+        return JSONResponse({"audio_base64": audio_b64, "elapsed": 0.0, "cached": True})
+
     ref_text = (voice_dir / "voice.txt").read_text(encoding="utf-8") if (voice_dir / "voice.txt").exists() else None
     t0 = time.time()
     try:
@@ -173,8 +189,48 @@ async def tts_endpoint(body: dict = Body(...)):
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
     elapsed = round(time.time() - t0, 2)
+
+    # キャッシュ保存
+    cache_file.write_bytes(wav_bytes)
+
     audio_b64 = base64.b64encode(wav_bytes).decode()
-    return JSONResponse({"audio_base64": audio_b64, "elapsed": elapsed})
+    return JSONResponse({"audio_base64": audio_b64, "elapsed": elapsed, "cached": False})
+
+
+def _do_warm_cache(voice_dir: Path, texts: list):
+    ref_text = (voice_dir / "voice.txt").read_text(encoding="utf-8") if (voice_dir / "voice.txt").exists() else None
+    for text in texts:
+        if not text.strip():
+            continue
+        cache_file = _tts_cache_path(voice_dir, text)
+        if cache_file.exists():
+            continue
+        try:
+            wav_bytes = synthesize(text, str(voice_dir / "voice.wav"), ref_text)
+            cache_file.write_bytes(wav_bytes)
+        except Exception as e:
+            print(f"warm-cache failed: {e}")
+
+
+@app.post("/voices/{voice_id}/warm-cache")
+def warm_cache_endpoint(voice_id: str, body: dict = Body(...)):
+    texts = body.get("texts", [])
+    voice_dir = _get_voice_dir(voice_id)
+    if voice_dir is None:
+        raise HTTPException(status_code=404, detail="Voice not found")
+    threading.Thread(target=_do_warm_cache, args=(voice_dir, texts[:30]), daemon=True).start()
+    return JSONResponse({"status": "warming", "count": len(texts)})
+
+
+@app.post("/tts/cache-check")
+def tts_cache_check(body: dict = Body(...)):
+    voice_id = body.get("voice_id")
+    texts = body.get("texts", [])
+    voice_dir = _get_voice_dir(voice_id)
+    if voice_dir is None:
+        return JSONResponse({"ready": []})
+    ready = [t for t in texts if _tts_cache_path(voice_dir, t).exists()]
+    return JSONResponse({"ready": ready})
 
 
 # ── 기존 /chat (호환성 유지) ──────────────────────────────────────────────────
