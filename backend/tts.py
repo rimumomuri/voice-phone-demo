@@ -41,6 +41,9 @@ def _synthesize_voxcpm(text: str, reference_wav_path: str, reference_text: str =
     else:
         sr = 24000
 
+    import sys
+    print(f"[TTS] VoxCPM output: shape={getattr(audio, 'shape', 'N/A')}, sr={sr}, dtype={getattr(audio, 'dtype', 'N/A')}", file=sys.stderr)
+
     # 44100Hz 리샘플링 (브라우저 호환성)
     if sr != 44100:
         try:
